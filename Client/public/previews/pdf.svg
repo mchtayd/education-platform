@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0" stop-color="#ffebee"></stop>
+      <stop offset="1" stop-color="#ffcdd2"></stop>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="600" fill="url(#g)"></rect>
+  <rect x="380" y="120" width="440" height="360" rx="18" fill="#ffffff" opacity="0.95"></rect>
+  <path d="M760 120v70h70" fill="none" stroke="#d32f2f" stroke-width="10" stroke-linecap="round"></path>
+  <rect x="430" y="190" width="340" height="46" rx="10" fill="#d32f2f" opacity="0.12"></rect>
+  <text x="600" y="290" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="86" font-weight="800" fill="#d32f2f">PDF</text>
+  <text x="600" y="350" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#616161">EĞİTİM İÇERİĞİ</text>
+</svg>
