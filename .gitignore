@@ -1,2 +1,6 @@
 # uploads (runtime files)
 API/wwwroot/uploads/
+API/bin/
+API/obj/
+**/bin/
+**/obj/
