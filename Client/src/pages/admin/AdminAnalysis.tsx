@@ -186,7 +186,7 @@ export default function AdminAnalysis() {
 
   /* ------------ Loaders ------------ */
   const loadLookups = async () => {
-    const { data } = await api.get("/api/Analysis/lookups");
+    const { data } = await api.get("/Analysis/lookups");
     if (!mounted.current) return;
     setProjects(data.projects ?? []);
     setTrainings(data.trainings ?? []);
@@ -195,7 +195,7 @@ export default function AdminAnalysis() {
   const loadAssignments = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get<AssignmentRow[]>("/api/Analysis/assignments", {
+      const { data } = await api.get<AssignmentRow[]>("/Analysis/assignments", {
         params: {
           search: qDebounced || undefined,
           projectId: projectId || undefined,
@@ -215,7 +215,7 @@ export default function AdminAnalysis() {
   const loadFeedback = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/api/Analysis/feedback", {
+      const { data } = await api.get("/Analysis/feedback", {
         params: {
           search: qDebounced || undefined,
           projectId: projectId || undefined,
@@ -236,7 +236,7 @@ export default function AdminAnalysis() {
 
   const loadExamOptions = async () => {
     try {
-      const { data } = await api.get<ExamOption[]>("/api/Analysis/exams");
+      const { data } = await api.get<ExamOption[]>("/Analysis/exams");
       if (!mounted.current) return;
       setExamOptions(data ?? []);
     } catch (e: any) {
@@ -247,7 +247,7 @@ export default function AdminAnalysis() {
   const loadExamStats = async (examId: number) => {
     setExamStatsLoading(true);
     try {
-      const { data } = await api.get<ExamStatsResponse>(`/api/Analysis/exams/${examId}/question-stats`);
+      const { data } = await api.get<ExamStatsResponse>(`/Analysis/exams/${examId}/question-stats`);
       if (!mounted.current) return;
       setExamStats(data);
     } catch (e: any) {

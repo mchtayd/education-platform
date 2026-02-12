@@ -110,7 +110,7 @@ export default function AdminMessages() {
   const loadProjects = async () => {
     setProjectsLoading(true);
     try {
-      const { data } = await api.get<ProjectOpt[]>("/api/Messages/projects");
+      const { data } = await api.get<ProjectOpt[]>("/Messages/projects");
       setProjects(data ?? []);
     } catch {
       setProjects([]);
@@ -122,7 +122,7 @@ export default function AdminMessages() {
   const loadThreads = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get<ThreadRow[]>("/api/Messages/threads", {
+      const { data } = await api.get<ThreadRow[]>("/Messages/threads", {
         params: {
           search: qDeb || undefined,
           projectId: projectId > 0 ? projectId : undefined, // ✅ NEW
@@ -137,7 +137,7 @@ export default function AdminMessages() {
   const loadDetail = async (id: number) => {
     setDetailLoading(true);
     try {
-      const { data } = await api.get<ThreadDetail>(`/api/Messages/threads/${id}`);
+      const { data } = await api.get<ThreadDetail>(`/Messages/threads/${id}`);
       setDetail(data);
       window.dispatchEvent(new Event("messagesChanged"));
     } finally {
@@ -150,7 +150,7 @@ export default function AdminMessages() {
     const msg = text.trim();
     if (!msg) return;
 
-    await api.post(`/api/Messages/threads/${selectedId}/messages`, { message: msg });
+    await api.post(`/Messages/threads/${selectedId}/messages`, { message: msg });
     setText("");
     await loadDetail(selectedId);
     await loadThreads();
@@ -158,7 +158,7 @@ export default function AdminMessages() {
   };
 
   const deleteThread = async (threadId: number) => {
-    await api.delete(`/api/Messages/threads/${threadId}`);
+    await api.delete(`/Messages/threads/${threadId}`);
     window.dispatchEvent(new Event("messagesChanged"));
 
     if (selectedId === threadId) {
@@ -171,7 +171,7 @@ export default function AdminMessages() {
   };
 
   const deleteAllThreads = async () => {
-    await api.delete(`/api/Messages/threads`);
+    await api.delete(`/Messages/threads`);
     window.dispatchEvent(new Event("messagesChanged"));
 
     setSelectedId(null);

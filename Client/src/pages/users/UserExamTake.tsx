@@ -65,7 +65,7 @@ export default function UserExamTake() {
   const [answerMap, setAnswerMap] = useState<Record<number, number | null>>({}); // questionId -> choiceId
 
   const load = async () => {
-    const { data } = await api.get<AttemptData>(`/api/MyExams/attempt/${attemptId}`);
+    const { data } = await api.get<AttemptData>(`/MyExams/attempt/${attemptId}`);
     setData(data);
 
     const m: Record<number, number | null> = {};
@@ -113,7 +113,7 @@ export default function UserExamTake() {
 
     (async () => {
       try {
-        const { data: res } = await api.post(`/api/MyExams/attempt/${data.attemptId}/submit`);
+        const { data: res } = await api.post(`/MyExams/attempt/${data.attemptId}/submit`);
         setSnack({
           open: true,
           msg: res.message || "Sınav süresi tamamlandı. Cevaplarınız kaydedildi.",
@@ -140,7 +140,7 @@ export default function UserExamTake() {
     setAnswerMap((prev) => ({ ...prev, [questionId]: choiceId }));
 
     try {
-      await api.post(`/api/MyExams/attempt/${data!.attemptId}/answer`, { questionId, choiceId });
+      await api.post(`/MyExams/attempt/${data!.attemptId}/answer`, { questionId, choiceId });
     } catch (e: any) {
       setSnack({
         open: true,
@@ -153,7 +153,7 @@ export default function UserExamTake() {
 
   const submit = async () => {
     try {
-      const { data: res } = await api.post(`/api/MyExams/attempt/${data!.attemptId}/submit`);
+      const { data: res } = await api.post(`/MyExams/attempt/${data!.attemptId}/submit`);
       if (res?.message) setSnack({ open: true, msg: res.message, type: "info" });
       await load();
       setConfirmEnd(false);

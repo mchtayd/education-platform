@@ -42,7 +42,7 @@ export default function ForcePasswordChange() {
 
     setSaving(true);
     try {
-      const { data } = await api.post("/api/Account/change-password", {
+      const { data } = await api.post("/Account/change-password", {
         currentPassword,
         newPassword,
       });

@@ -65,7 +65,7 @@ export default function UserExams() {
   const [rows, setRows] = useState<ExamRow[]>([]);
 
   const load = async () => {
-    const { data } = await api.get<ExamRow[]>("/api/MyExams/list", {
+    const { data } = await api.get<ExamRow[]>("/MyExams/list", {
       params: { search: q || undefined },
     });
     setRows(data);

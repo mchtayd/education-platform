@@ -48,13 +48,13 @@ export default function UserTrainings() {
     try {
       if (!categoryId) {
         // Tüm kategoriler için kısayol: kategori listesindeki ilkini yükleyebilirsiniz.
-        const { data: cats } = await api.get<{id:number}[]>("/api/My/categories");
+        const { data: cats } = await api.get<{id:number}[]>("/My/categories");
         const cid = cats[0]?.id;
         if (!cid) { setRows([]); return; }
-        const { data } = await api.get<Row[]>("/api/My/trainings", { params: { categoryId: cid, search: q || undefined }});
+        const { data } = await api.get<Row[]>("/My/trainings", { params: { categoryId: cid, search: q || undefined }});
         setRows(data);
       } else {
-        const { data } = await api.get<Row[]>("/api/My/trainings", { params: { categoryId, search: q || undefined }});
+        const { data } = await api.get<Row[]>("/My/trainings", { params: { categoryId, search: q || undefined }});
         setRows(data);
       }
     } catch (e:any) {
@@ -73,14 +73,14 @@ export default function UserTrainings() {
     window.open(`${base}${r.fileUrl}`, "_blank", "noopener,noreferrer");
     // İzlenmiş olarak işaretle (progress=100)
     try {
-      await api.post(`/api/My/progress/view/${r.id}`, { progress: 100 });
+      await api.post(`/My/progress/view/${r.id}`, { progress: 100 });
       await load();
     } catch {}
   };
 
   const saveFeedback = async (r: Row, rating: number, comment: string) => {
     try {
-      await api.post(`/api/My/progress/feedback/${r.id}`, { rating, comment });
+      await api.post(`/My/progress/feedback/${r.id}`, { rating, comment });
       setSnack({open:true, msg:"Geri bildiriminiz kaydedildi.", type:"success"});
       await load();
     } catch (e:any) {

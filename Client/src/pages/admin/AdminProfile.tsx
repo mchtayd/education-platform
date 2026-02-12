@@ -78,7 +78,7 @@ export default function AdminProfile() {
     try {
       // Projende "me" endpoint'i hangisiyse biri mutlaka tutacaktır.
       const endpoints = [
-        "/api/Auth/me",
+        "/Auth/me",
       ];
 
       let data: any = null;

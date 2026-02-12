@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:16
@@ -20,6 +18,18 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=education;Username=postgres;Password=mchtayd;Pooling=true
+
+      # JWT (Production'da gerekli)
+      Jwt__Key: "super-secret-key-change-this-please-32bytes"
+      Jwt__Issuer: "EducationPlatform"
+      Jwt__Audience: "EducationPlatformClient"
+      Jwt__ExpiresMinutes: "120"
+
+      # Seed Admin (Production'da da oluşturulsun)
+      SeedAdmin__Email: "admin@edu.local"
+      SeedAdmin__Password: "Admin*12345"
+      SeedAdmin__Name: "Admin"
+      SeedAdmin__Surname: "User"
     depends_on:
       - db
     expose:
@@ -33,8 +43,8 @@ services:
     depends_on:
       - api
     ports:
-      - "80:80"
+      - "8081:80"
     restart: unless-stopped
 
 volumes:
-  pgdata:
+  pgdata: {}

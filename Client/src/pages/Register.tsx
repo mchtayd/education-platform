@@ -195,7 +195,7 @@ export default function RegisterPage() {
 
     try {
       const { data } = await api.post<SendRegisterCodeResponse>(
-        "/api/Auth/send-register-code",
+        "/Auth/send-register-code",
         { email }
       );
 
@@ -220,7 +220,7 @@ export default function RegisterPage() {
   };
 
   const doRegister = async (values: FormValues) => {
-    await api.post("/api/Auth/register", {
+    await api.post("/Auth/register", {
       name: toUpperTr(values.name),
       surname: toUpperTr(values.surname),
       email: (values.email ?? "").trim().toLowerCase(),
@@ -271,7 +271,7 @@ export default function RegisterPage() {
 
     try {
       // ✅ verificationId artık gönderiliyor
-      await api.post("/api/Auth/verify-register-code", {
+      await api.post("/Auth/verify-register-code", {
         verificationId,
         email,
         code,
@@ -343,7 +343,7 @@ export default function RegisterPage() {
       setInstError(null);
 
       try {
-        const { data } = await api.get<InstitutionDto[]>("/api/Institutions");
+        const { data } = await api.get<InstitutionDto[]>("/Institutions");
         if (!alive) return;
 
         const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name, "tr"));

@@ -34,7 +34,7 @@ export default function ForgotPasswordPage() {
     setServerError(null); setOk(null); setLoading(true);
     try {
       // Backend uç: ihtiyacına göre değiştir (ör: /api/Auth/forgot-password)
-      await api.post("/api/Auth/forgot-password", {
+      await api.post("/Auth/forgot-password", {
         name: values.name,
         surname: values.surname,
         email: values.email,

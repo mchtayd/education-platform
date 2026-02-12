@@ -91,7 +91,7 @@ export default function PublishTrainingsTab({ excludeAdmins = true }: PublishTra
   };
 
   const loadData = async () => {
-    const { data } = await api.get("/api/Trainings/assign-data");
+    const { data } = await api.get("/Trainings/assign-data");
 
     setTrainings(data.trainings);
     setProjects(data.projects);
@@ -111,7 +111,7 @@ export default function PublishTrainingsTab({ excludeAdmins = true }: PublishTra
   };
 
   const loadAssignments = async () => {
-    const { data } = await api.get("/api/Trainings/assignments", {
+    const { data } = await api.get("/Trainings/assignments", {
       params: { search: search || undefined },
     });
     setAssignments(data ?? []);
@@ -185,13 +185,13 @@ export default function PublishTrainingsTab({ excludeAdmins = true }: PublishTra
           return;
         }
 
-        await api.post("/api/Trainings/assign-to-users", {
+        await api.post("/Trainings/assign-to-users", {
           trainingIds,
           userIds,
           unpublishDate: unpublishDateIso, // ✅ NEW
         });
       } else {
-        await api.post("/api/Trainings/assign-to-project", {
+        await api.post("/Trainings/assign-to-project", {
           trainingIds,
           projectId: selectedProject!.id,
           unpublishDate: unpublishDateIso, // ✅ NEW
@@ -216,7 +216,7 @@ export default function PublishTrainingsTab({ excludeAdmins = true }: PublishTra
 
   const removeAssignment = async (row: AssignmentRow) => {
     if (!confirm("Bu atama geri alınsın mı?")) return;
-    await api.delete(`/api/Trainings/assignments/${row.id}`);
+    await api.delete(`/Trainings/assignments/${row.id}`);
     await loadAssignments();
   };
 

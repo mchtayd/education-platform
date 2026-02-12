@@ -37,7 +37,7 @@ export default function ProjectManageDialog({ open, onClose, onChanged }: Props)
   const [error, setError] = useState<string | null>(null);
 
   const loadProjects = async () => {
-    const { data } = await api.get<Project[]>("/api/Users/projects");
+    const { data } = await api.get<Project[]>("/Users/projects");
     setProjects(data);
     onChanged?.(data);
   };
@@ -58,7 +58,7 @@ export default function ProjectManageDialog({ open, onClose, onChanged }: Props)
     setBusy(true);
     setError(null);
     try {
-      await api.post("/api/Users/projects", { name });
+      await api.post("/Users/projects", { name });
       setNewName("");
       await loadProjects();
     } catch (e: any) {
@@ -74,7 +74,7 @@ export default function ProjectManageDialog({ open, onClose, onChanged }: Props)
     setBusy(true);
     setError(null);
     try {
-      await api.delete(`/api/Users/projects/${id}`);
+      await api.delete(`/Users/projects/${id}`);
       await loadProjects();
     } catch (e: any) {
       setError(e?.response?.data?.message ?? "Proje silinemedi.");

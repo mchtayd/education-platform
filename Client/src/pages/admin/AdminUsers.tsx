@@ -76,7 +76,7 @@ export default function AdminUsers() {
   const currentTab = params.get("tab") ?? "requests";
   const goTab = (v: string) => setParams({ tab: v });
 
-  const APPROVE_PATH = "/api/Users/approve-request";
+  const APPROVE_PATH = "/Users/approve-request";
 
   const [loading, setLoading] = useState(false);
 
@@ -146,24 +146,24 @@ export default function AdminUsers() {
 
   // ---------- Loaders ----------
   const loadProjects = async () => {
-    const { data } = await api.get<Project[]>("/api/Users/projects");
+    const { data } = await api.get<Project[]>("/Users/projects");
     setProjects(data);
   };
 
   const loadInstitutions = async () => {
-    const { data } = await api.get<Institution[]>("/api/Institutions");
+    const { data } = await api.get<Institution[]>("/Institutions");
     setInstitutions(data);
   };
 
   const loadRequests = async () => {
-    const { data } = await api.get<RequestRow[]>("/api/Users/admin-requests", {
+    const { data } = await api.get<RequestRow[]>("/Users/admin-requests", {
       params: { search: reqSearch || undefined },
     });
     setRequests(data);
   };
 
   const loadUsers = async () => {
-    const { data } = await api.get<UserRow[]>("/api/Users/admin-list", {
+    const { data } = await api.get<UserRow[]>("/Users/admin-list", {
       params: { search: userSearch || undefined },
     });
     setUsers(data);
@@ -201,7 +201,7 @@ const getProjectLabel = (ids: number[]) => {
   const createProject = async () => {
     if (!newProject.trim()) return;
     try {
-      await api.post("/api/Users/projects", { name: newProject.trim() });
+      await api.post("/Users/projects", { name: newProject.trim() });
       await loadProjects();
       setProjDialog(false);
       setSnack({ open: true, msg: "Proje eklendi.", severity: "success" });
@@ -213,7 +213,7 @@ const getProjectLabel = (ids: number[]) => {
   const deleteProject = async (id: number) => {
     if (!confirm("Projeyi silmek istiyor musunuz?")) return;
     try {
-      await api.delete(`/api/Users/projects/${id}`);
+      await api.delete(`/Users/projects/${id}`);
       await loadProjects();
       setSnack({ open: true, msg: "Proje silindi.", severity: "success" });
     } catch (err: any) {
@@ -230,7 +230,7 @@ const getProjectLabel = (ids: number[]) => {
   const createInstitution = async () => {
     if (!newInstitution.trim()) return;
     try {
-      await api.post("/api/Institutions", { name: newInstitution.trim() });
+      await api.post("/Institutions", { name: newInstitution.trim() });
       await loadInstitutions();
       setInstDialog(false);
       setSnack({ open: true, msg: "Kurum eklendi.", severity: "success" });
@@ -242,7 +242,7 @@ const getProjectLabel = (ids: number[]) => {
   const deleteInstitution = async (id: number) => {
     if (!confirm("Kurumu silmek istiyor musunuz?")) return;
     try {
-      await api.delete(`/api/Institutions/${id}`);
+      await api.delete(`/Institutions/${id}`);
       await loadInstitutions();
       setSnack({ open: true, msg: "Kurum silindi.", severity: "success" });
     } catch (err: any) {
@@ -276,19 +276,19 @@ const getProjectLabel = (ids: number[]) => {
 
   const reject = async (r: RequestRow) => {
     if (!confirm("Talebi reddetmek istiyor musunuz?")) return;
-    await api.post(`/api/Users/reject-request/${r.id}`);
+    await api.post(`/Users/reject-request/${r.id}`);
     await loadRequests();
   };
 
   // ---------- Users actions ----------
   const toggleActive = async (u: UserRow) => {
-    await api.patch(`/api/Users/${u.id}/toggle-active`);
+    await api.patch(`/Users/${u.id}/toggle-active`);
     await loadUsers();
   };
 
   const deleteUser = async (u: UserRow) => {
     if (!confirm("Hesabı silmek istiyor musunuz?")) return;
-    await api.delete(`/api/Users/${u.id}`);
+    await api.delete(`/Users/${u.id}`);
     await loadUsers();
   };
 
@@ -327,7 +327,7 @@ const getProjectLabel = (ids: number[]) => {
     };
 
     try {
-      await api.put(`/api/Users/${editUser.id}`, body);
+      await api.put(`/Users/${editUser.id}`, body);
       setSnack({ open: true, msg: "Kullanıcı güncellendi.", severity: "success" });
       setEditOpen(false);
       setEditUser(null);
@@ -349,7 +349,7 @@ const getProjectLabel = (ids: number[]) => {
         projectId: createForm.projectIds[0] ?? null,
       };
 
-      await api.post("/api/Users/admin-create", body);
+      await api.post("/Users/admin-create", body);
 
       setSnack({ open: true, msg: "Kullanıcı oluşturuldu. Direkt giriş yapabilir.", severity: "success" });
 

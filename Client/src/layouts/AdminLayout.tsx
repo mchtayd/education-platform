@@ -89,7 +89,7 @@ export default function AdminLayout() {
 
   const loadUnreadMsgs = async () => {
     try {
-      const url = isEducator ? "/api/MyMessages/unread-count" : "/api/Messages/unread-count";
+      const url = isEducator ? "/MyMessages/unread-count" : "/Messages/unread-count";
       const { data } = await api.get<{ count: number }>(url);
       setUnread(data?.count ?? 0);
     } catch {
@@ -104,7 +104,7 @@ export default function AdminLayout() {
     let alive = true;
     const fetchCount = async () => {
       try {
-        const { data } = await api.get("/api/Users/requests/count");
+        const { data } = await api.get("/Users/requests/count");
         if (alive) setPendingCount(data?.count ?? 0);
       } catch {}
     };

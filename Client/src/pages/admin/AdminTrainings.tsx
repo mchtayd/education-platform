@@ -79,13 +79,13 @@ export default function AdminTrainings() {
   const allowedProjectSet = useMemo(() => new Set(projects.map(p => p.id)), [projects]);
 
   const loadCategories = async () => {
-    const { data } = await api.get<Category[]>("/api/TrainingCategories");
+    const { data } = await api.get<Category[]>("/TrainingCategories");
     setCategories(data);
   };
 
   const loadProjects = async () => {
     // ✅ backend artık educator ise sadece kendi projelerini döndürüyor
-    const { data } = await api.get<Project[]>("/api/Users/projects");
+    const { data } = await api.get<Project[]>("/Users/projects");
     setProjects(data);
   };
 
@@ -96,7 +96,7 @@ export default function AdminTrainings() {
     if (filterType) params.type = filterType;
     if (filterProject) params.projectId = filterProject;
 
-    const { data } = await api.get<Training[]>("/api/Trainings", { params });
+    const { data } = await api.get<Training[]>("/Trainings", { params });
     setTrainings(data);
   };
 
@@ -141,11 +141,11 @@ export default function AdminTrainings() {
       if (projectId !== "") fd.append("projectId", String(projectId));
 
       if (editingId) {
-        await api.put(`/api/Trainings/${editingId}`, fd);
+        await api.put(`/Trainings/${editingId}`, fd);
         // await api.put(`/api/Trainings/${editingId}`, fd, { headers: { "Content-Type": "multipart/form-data" } });
         notify("Eğitim güncellendi.");
       } else {
-        await api.post("/api/Trainings", fd);
+        await api.post("/Trainings", fd);
         // await api.post("/api/Trainings", fd, { headers: { "Content-Type": "multipart/form-data" } });
         notify("Eğitim kaydedildi.");
       }
@@ -161,7 +161,7 @@ export default function AdminTrainings() {
   const onDelete = async (id: number) => {
     if (!confirm("Eğitimi silmek istediğinize emin misiniz?")) return;
     try {
-      await api.delete(`/api/Trainings/${id}`);
+      await api.delete(`/Trainings/${id}`);
       notify("Eğitim silindi.");
       await loadTrainings();
     } catch (e: any) {

@@ -36,7 +36,7 @@ export default function CategoryManageDialog({ open, onClose, onChanged }: Props
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
-    const { data } = await api.get<Category[]>("/api/TrainingCategories");
+    const { data } = await api.get<Category[]>("/TrainingCategories");
     setItems(data);
     onChanged?.(data);
   };
@@ -57,7 +57,7 @@ export default function CategoryManageDialog({ open, onClose, onChanged }: Props
     setBusy(true);
     setError(null);
     try {
-      await api.post("/api/TrainingCategories", { name: v });
+      await api.post("/TrainingCategories", { name: v });
       setName("");
       await load();
     } catch (e: any) {
@@ -73,7 +73,7 @@ export default function CategoryManageDialog({ open, onClose, onChanged }: Props
     setBusy(true);
     setError(null);
     try {
-      await api.delete(`/api/TrainingCategories/${id}`);
+      await api.delete(`/TrainingCategories/${id}`);
       await load();
     } catch (e: any) {
       setError(e?.response?.data?.message ?? "Kategori silinemedi.");

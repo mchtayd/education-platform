@@ -3,12 +3,12 @@ import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
 
 type Props = {
   /** Görsel/lojik farklılık istersek kullanırız (şimdilik sadece tip güvenliği için) */
-  variant?: 'admin' | 'user';
+  // variant?: 'admin' | 'user';
   /** Sağ taraftaki başlık (varsayılan: Eğitim Platformu) */
   leftTitle?: string;
 };
 
-export default function Navbar({ variant = 'user', leftTitle = 'Eğitim Platformu' }: Props) {
+export default function Navbar({ leftTitle = 'Eğitim Platformu' }: Props) {
 //   const { logout, user } = useAuth();
 //   const navigate = useNavigate();
 

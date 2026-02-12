@@ -109,7 +109,7 @@ export default function UserMessages() {
   const loadThreads = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get<ThreadRow[]>("/api/MyMessages/threads");
+      const { data } = await api.get<ThreadRow[]>("/MyMessages/threads");
       setThreads(data);
       if (!selectedId && data.length > 0) setSelectedId(data[0].id);
     } finally {
@@ -120,7 +120,7 @@ export default function UserMessages() {
   const loadDetail = async (id: number) => {
     setDetailLoading(true);
     try {
-      const { data } = await api.get<ThreadDetail>(`/api/MyMessages/threads/${id}`);
+      const { data } = await api.get<ThreadDetail>(`/MyMessages/threads/${id}`);
       setDetail(data);
       window.dispatchEvent(new Event("messagesChanged"));
     } finally {
@@ -132,7 +132,7 @@ export default function UserMessages() {
   const loadProjects = async () => {
     setProjectsLoading(true);
     try {
-      const { data } = await api.get<ProjectOpt[]>("/api/MyMessages/projects");
+      const { data } = await api.get<ProjectOpt[]>("/MyMessages/projects");
       setProjects(data ?? []);
     } catch {
       setProjects([]);
@@ -158,7 +158,7 @@ export default function UserMessages() {
     if (!subj) return;
     if (!msg) return;
 
-    const { data } = await api.post("/api/MyMessages/threads", {
+    const { data } = await api.post("/MyMessages/threads", {
       projectId,
       subject: subj,
       message: msg,
@@ -176,14 +176,14 @@ export default function UserMessages() {
     const msg = text.trim();
     if (!msg) return;
 
-    await api.post(`/api/MyMessages/threads/${selectedId}/messages`, { message: msg });
+    await api.post(`/MyMessages/threads/${selectedId}/messages`, { message: msg });
     setText("");
     await loadDetail(selectedId);
     await loadThreads();
   };
 
   const deleteThread = async (threadId: number) => {
-    await api.delete(`/api/MyMessages/threads/${threadId}`);
+    await api.delete(`/MyMessages/threads/${threadId}`);
     window.dispatchEvent(new Event("messagesChanged"));
 
     if (selectedId === threadId) {
@@ -196,7 +196,7 @@ export default function UserMessages() {
   };
 
   const deleteAllThreads = async () => {
-    await api.delete(`/api/MyMessages/threads`);
+    await api.delete(`/MyMessages/threads`);
     window.dispatchEvent(new Event("messagesChanged"));
 
     setSelectedId(null);

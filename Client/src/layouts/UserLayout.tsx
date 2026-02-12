@@ -93,7 +93,7 @@ export default function UserLayout() {
 
   const loadUnread = async () => {
     try {
-      const { data } = await api.get<{ count: number }>("/api/MyMessages/unread-count");
+      const { data } = await api.get<{ count: number }>("/MyMessages/unread-count");
       setUnread(data?.count ?? 0);
     } catch {}
   };
@@ -112,7 +112,7 @@ export default function UserLayout() {
   // ---------------- Loads ----------------
   const loadCats = async () => {
     try {
-      const { data } = await api.get<Category[]>("/api/My/categories");
+      const { data } = await api.get<Category[]>("/My/categories");
       setCategories(data);
     } catch {
       // sessiz
@@ -121,7 +121,7 @@ export default function UserLayout() {
 
   const loadExamNav = async () => {
     try {
-      const { data } = await api.get<ExamNavItem[]>("/api/MyExams/nav");
+      const { data } = await api.get<ExamNavItem[]>("/MyExams/nav");
       setNavExams(data ?? []);
     } catch {
       setNavExams([]);

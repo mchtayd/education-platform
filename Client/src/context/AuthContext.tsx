@@ -107,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn: AuthContextType["signIn"] = async (email, password, remember) => {
-    const { data } = await api.post<LoginResponse>("/api/Auth/login", { email, password });
+    const { data } = await api.post<LoginResponse>("/Auth/login", { email, password });
     if (!data?.token || !data?.user) throw new Error("Sunucu beklenen formatta yanıt vermedi.");
 
     setAuthHeader(data.token);

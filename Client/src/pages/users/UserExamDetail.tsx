@@ -37,7 +37,7 @@ export default function UserExamDetail() {
   }>({ open: false, msg: "", type: "info" });
 
   const load = async () => {
-    const { data } = await api.get<Detail>(`/api/MyExams/exam/${examId}`);
+    const { data } = await api.get<Detail>(`/MyExams/exam/${examId}`);
     setData(data);
   };
 
@@ -48,7 +48,7 @@ export default function UserExamDetail() {
 
   const start = async () => {
     try {
-      const { data: res } = await api.post(`/api/MyExams/start/${examId}`);
+      const { data: res } = await api.post(`/MyExams/start/${examId}`);
 
       if (res?.autoSubmitted) {
         setSnack({ open: true, msg: res.message || "Süre doldu.", type: "warning" });

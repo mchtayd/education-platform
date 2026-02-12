@@ -95,7 +95,7 @@ export default function AdminExam() {
   // ---- Helpers ----
   const uploadChoiceImage = async (file: File): Promise<string> => {
     const fd = new FormData(); fd.append("file", file);
-    const { data } = await api.post<{ url: string }>("/api/Files/choice-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+    const { data } = await api.post<{ url: string }>("/Files/choice-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
     return data.url;
   };
 
@@ -121,7 +121,7 @@ export default function AdminExam() {
     setReviewDlg({ open: true, loading: true });
     setMsgText(""); // ✅ dialog açılınca temizle
     try {
-      const { data } = await api.get<AttemptReview>(`/api/Exams/attempts/${attemptId}/review`);
+      const { data } = await api.get<AttemptReview>(`/Exams/attempts/${attemptId}/review`);
       setReviewDlg({ open: true, loading: false, data });
     } catch (e: any) {
       notify(e?.response?.data || "İnceleme açılamadı.", "error");
@@ -139,7 +139,7 @@ export default function AdminExam() {
 
     setMsgSending(true);
     try {
-      await api.post(`/api/Exams/attempts/${attemptId}/message`, { message: text });
+      await api.post(`/Exams/attempts/${attemptId}/message`, { message: text });
       setMsgText("");
       notify("Mesaj kullanıcıya gönderildi.", "success");
       // istersen: window.dispatchEvent(new Event("messagesChanged"));
@@ -155,7 +155,7 @@ export default function AdminExam() {
     return;
 
   try {
-    await api.delete(`/api/Exams/${exam.id}`);
+    await api.delete(`/Exams/${exam.id}`);
     notify("Sınav silindi.", "success");
 
     // Detay açıksa kapat
@@ -179,7 +179,7 @@ export default function AdminExam() {
     if (!title.trim()) { notify("Başlık zorunlu.", "error"); return; }
     if (questions.length === 0) { notify("En az 1 soru ekleyin.", "error"); return; }
     try {
-      await api.post("/api/Exams", {
+      await api.post("/Exams", {
         title: title.trim(),
         projectId: defaultProject || null,
         durationMinutes: duration,
@@ -196,27 +196,27 @@ export default function AdminExam() {
 
   // ---- Loads ----
   const loadProjects = async () => {
-    const { data } = await api.get<Project[]>("/api/Users/projects");
+    const { data } = await api.get<Project[]>("/Users/projects");
     setProjects(data);
   };
 
   const loadExams = async () => {
-    const { data } = await api.get<ExamLite[]>("/api/Exams", { params: { search: search || undefined } });
+    const { data } = await api.get<ExamLite[]>("/Exams", { params: { search: search || undefined } });
     setExams(data);
   };
 
   const openDetail = async (id: number) => {
-    const { data } = await api.get<ExamDetail>(`/api/Exams/${id}`);
+    const { data } = await api.get<ExamDetail>(`/Exams/${id}`);
     setDetailDlg({ open: true, data });
   };
 
   const loadAssignData = async () => {
-    const { data } = await api.get("/api/Exams/assign-data");
+    const { data } = await api.get("/Exams/assign-data");
     setAssignData(data);
   };
 
   const loadAssignments = async () => {
-    const { data } = await api.get<AssignmentRow[]>("/api/Exams/assignments", { params: { search: assignSearch || undefined } });
+    const { data } = await api.get<AssignmentRow[]>("/Exams/assignments", { params: { search: assignSearch || undefined } });
     setAssignments(data);
   };
 
@@ -224,13 +224,13 @@ export default function AdminExam() {
     try {
       if (selExams.length === 0) return;
       if (mode === "user") {
-        await api.post("/api/Exams/assign-to-users", {
+        await api.post("/Exams/assign-to-users", {
           examIds: selExams.map(x => x.id),
           userIds: selUsers.map(x => x.id)
         });
       } else {
         if (!selProject) return;
-        await api.post("/api/Exams/assign-to-project", {
+        await api.post("/Exams/assign-to-project", {
           examIds: selExams.map(x => x.id),
           projectId: selProject.id
         });
@@ -245,12 +245,12 @@ export default function AdminExam() {
 
   const unpublish = async (row: AssignmentRow) => {
     if (!confirm("Bu yayın kaldırılacak. Emin misiniz?")) return;
-    await api.delete(`/api/Exams/assignments/${row.id}`);
+    await api.delete(`/Exams/assignments/${row.id}`);
     await loadAssignments();
   };
 
   const loadAttempts = async () => {
-    const { data } = await api.get<AttemptRow[]>("/api/Exams/attempts", { params: { search: attemptSearch || undefined } });
+    const { data } = await api.get<AttemptRow[]>("/Exams/attempts", { params: { search: attemptSearch || undefined } });
     setAttempts(data);
   };
 
