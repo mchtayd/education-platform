@@ -39,6 +39,8 @@ services:
   web:
     build:
       context: ./Client
+      args:
+        VITE_API_URL: /api
     container_name: edu_web
     depends_on:
       - api
