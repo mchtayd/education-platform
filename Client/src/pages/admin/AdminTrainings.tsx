@@ -101,9 +101,18 @@ export default function AdminTrainings() {
   };
 
   const fullFileUrl = (p: string) => {
-    const base = (api.defaults.baseURL || "").replace(/\/$/, "");
-    return /^https?:\/\//i.test(p) ? p : `${base}${p}`;
-  };
+  if (!p) return "";
+  if (/^https?:\/\//i.test(p)) return p;
+
+  const base = api.defaults.baseURL || window.location.origin;
+
+  try {
+    const u = new URL(base);
+    return `${u.origin}${p.startsWith("/") ? p : `/${p}`}`;
+  } catch {
+    return `${window.location.origin}${p.startsWith("/") ? p : `/${p}`}`;
+  }
+};
 
   useEffect(() => { loadCategories(); loadProjects(); }, []);
   useEffect(() => { loadTrainings(); }, [q, filterCategory, filterType, filterProject]);
