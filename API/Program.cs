@@ -10,6 +10,9 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using Microsoft.AspNetCore.Http.Features;
 
+// ✅ EKLENDİ
+using Microsoft.Extensions.FileProviders;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ---------- DbContext ----------
@@ -31,7 +34,7 @@ builder.Services.AddCors(opt =>
         )
         .AllowAnyHeader()
         .AllowAnyMethod()
-        .AllowCredentials()   // preflight include modunda gerekli
+        .AllowCredentials()
     );
 });
 
@@ -40,7 +43,6 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddScoped<ITokenService, TokenService>();
 
 builder.Services.AddHostedService<TrainingAutoUnpublishService>();
-
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 
 var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>()!;
@@ -57,7 +59,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwt.Audience
         };
 
-        // SignalR için (token querystring ile gelirse)
         o.Events = new JwtBearerEvents
         {
             OnMessageReceived = ctx =>
@@ -86,6 +87,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "API", Version = "v1" });
+
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -95,12 +97,18 @@ builder.Services.AddSwaggerGen(c =>
         In = ParameterLocation.Header,
         Description = "Bearer {token}"
     });
+
+    // ✅ HATA DÜZELTİLDİ: OpenApiReference.Reference yok
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
             new OpenApiSecurityScheme
             {
-                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
             },
             Array.Empty<string>()
         }
@@ -115,9 +123,9 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
 
-    var adminEmail   = builder.Configuration["SeedAdmin:Email"]?.Trim().ToLowerInvariant();
-    var adminPass    = builder.Configuration["SeedAdmin:Password"];
-    var adminName    = builder.Configuration["SeedAdmin:Name"] ?? "Admin";
+    var adminEmail = builder.Configuration["SeedAdmin:Email"]?.Trim().ToLowerInvariant();
+    var adminPass = builder.Configuration["SeedAdmin:Password"];
+    var adminName = builder.Configuration["SeedAdmin:Name"] ?? "Admin";
     var adminSurname = builder.Configuration["SeedAdmin:Surname"] ?? "User";
 
     if (!string.IsNullOrWhiteSpace(adminEmail) && !await db.Users.AnyAsync(u => u.Email == adminEmail))
@@ -147,10 +155,26 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Geliştirmede HTTPS’e zorunlu yönlendirmeyi kapatalım; farklı port/şema CORS’u zorlaştırıyor.
 // app.UseHttpsRedirection();
 
-app.UseStaticFiles();
+
+// ✅ STATIC FILES GARANTİSİ (mevcut yapıyı bozmadan)
+// app.UseStaticFiles();  // ❌ BUNU KALDIRDIK
+
+var webRoot = app.Environment.WebRootPath;
+if (string.IsNullOrWhiteSpace(webRoot))
+    webRoot = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+
+// Docker / prod’da klasör yoksa oluştur (static middleware'in boş kalmasını engeller)
+Directory.CreateDirectory(webRoot);
+Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "trainings"));
+
+// wwwroot altını (özellikle /uploads/...) servis et
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(webRoot),
+    RequestPath = ""   // kökten servis: /uploads/... çalışır
+});
 
 app.UseRouting();
 
@@ -163,7 +187,5 @@ app.UseAuthorization();
 // Endpoint mapping
 app.MapControllers().RequireCors(ClientCors);
 app.MapHub<AnalysisHub>("/hubs/analysis").RequireCors(ClientCors);
-
-
 
 app.Run();
