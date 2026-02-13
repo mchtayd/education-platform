@@ -16,10 +16,6 @@ import QuizIcon from "@mui/icons-material/Quiz";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-// Yöntem-1: src/assets içine koyduysan
-// import ugesLogo from "../../assets/uges-logo.png";
-// Yöntem-2: public içine koyduysan üstteki import'u kaldır, altta src="/uges-logo.png" kullan.
-
 const drawerWidth = 280;
 
 export default function AdminPortal() {
@@ -69,7 +65,7 @@ export default function AdminPortal() {
         </List>
       </Drawer>
 
-      {/* SAYFA İÇERİĞİ: SADECE SOLUK LOGO */}
+      {/* SAYFA İÇERİĞİ: LOGO KALDIRILDI */}
       <Box
         sx={{
           position: "relative",
@@ -77,37 +73,7 @@ export default function AdminPortal() {
           minHeight: "calc(100dvh - 64px)", // AppBar sticky yüksekliği 64px varsayımı
         }}
       >
-        <Box
-  aria-hidden
-  sx={{
-    position: "absolute",
-    inset: 0,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    pointerEvents: "none",
-    zIndex: 0,
-  }}
->
-  <Box
-    component="img"
-    src="/uges-logo.svg"
-    alt=""
-    loading="lazy"
-    decoding="async"
-    draggable={false}
-    sx={{
-      width: "150%",       // büyütme dışarıdan
-      maxWidth: "70vw",
-      height: "auto",
-      userSelect: "none",
-      pointerEvents: "none",
-      filter: "grayscale(5%)",
-    }}
-  />
-</Box>
-
-        {/* İçerik yok - sadece logo */}
+        {/* İçerik yok - sadece boş alan */}
         <Box sx={{ position: "relative", zIndex: 1 }} />
       </Box>
     </Box>
