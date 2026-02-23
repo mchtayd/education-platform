@@ -38,6 +38,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import SmartToyIcon from "@mui/icons-material/SmartToy";
 
 import { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -81,6 +82,7 @@ export default function AdminLayout() {
       { to: "/admin/users", label: "Kullanıcılar", icon: <PeopleIcon /> },
       { to: "/admin/analysis", label: "Analiz", icon: <AnalyticsIcon /> },
       { to: "/admin/exam", label: "Sınav", icon: <QuizIcon /> },
+      { label: "AI İçerik Sorgulama", icon: <SmartToyIcon />, to: "/admin/ai-content", key: "ai-content" },
     ];
   }, [isEducator]);
 

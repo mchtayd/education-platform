@@ -35,6 +35,9 @@ namespace API.Data
         public DbSet<UserRequest> UserRequests => Set<UserRequest>();
         public DbSet<AccountRequest> AccountRequests => Set<AccountRequest>();
 
+        public DbSet<AIDocument> AIDocuments => Set<AIDocument>();
+        public DbSet<AIDocumentChunk> AIDocumentChunks => Set<AIDocumentChunk>();
+
         protected override void OnModelCreating(ModelBuilder b)
         {
             // ---------- User ----------
@@ -70,15 +73,35 @@ namespace API.Data
             c.HasIndex(x => x.Name).IsUnique();
 
             // ---------- EmailVerifications ----------
-            var ev = b.Entity<EmailVerification>();
+var ev = b.Entity<EmailVerification>();
 ev.ToTable("EmailVerifications");
 ev.Property(x => x.Email).HasMaxLength(200);
 ev.Property(x => x.Salt).HasMaxLength(64);
 ev.Property(x => x.CodeHash).HasMaxLength(200);
 ev.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone");
 ev.Property(x => x.ExpiresAt).HasColumnType("timestamp with time zone");
-ev.Property(x => x.VerifiedAt).HasColumnType("timestamp with time zone");
-ev.HasIndex(x => x.Email);
+
+ev.Property(x => x.VerifiedAt).HasColumnType("timestamp with time zone"); // ✅ EKLENDİ
+
+ev.Property(x => x.Purpose).HasMaxLength(40);
+ev.Property(x => x.ResetSalt).HasMaxLength(64);
+ev.Property(x => x.ResetHash).HasMaxLength(200);
+ev.Property(x => x.UsedAt).HasColumnType("timestamp with time zone");
+
+ev.HasIndex(x => new { x.Email, x.Purpose });
+
+
+var d = b.Entity<AIDocument>();
+d.ToTable("AIDocuments");
+d.Property(x => x.FileName).HasMaxLength(300);
+d.Property(x => x.StoredFileName).HasMaxLength(300);
+d.Property(x => x.UploadedAt).HasColumnType("timestamp with time zone");
+
+var zz = b.Entity<AIDocumentChunk>();
+zz.ToTable("AIDocumentChunks");
+zz.Property(x => x.Text).HasMaxLength(12000);
+zz.Property(x => x.Embedding).HasColumnType("real[]");
+zz.HasIndex(x => x.DocumentId);
 
 
             // ---------- Training ----------

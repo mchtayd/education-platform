@@ -18,7 +18,7 @@ namespace API.Controllers
     {
         private readonly AppDbContext _db;
         private readonly ITokenService _tokens;
-        private readonly IEmailSender _email; // ✅ e-posta servisi eklendi
+        private readonly IEmailSender _email;
 
         public AuthController(AppDbContext db, ITokenService tokens, IEmailSender email)
         {
@@ -27,7 +27,7 @@ namespace API.Controllers
             _email = email;
         }
 
-        // ✅ JWT'den userId okuma (farklı claim adlarına tolerant)
+        // JWT'den userId okuma (farklı claim adlarına tolerant)
         private int? GetUserId()
         {
             var keys = new[] { ClaimTypes.NameIdentifier, "nameid", "sub", "id", "userId" };
@@ -39,30 +39,279 @@ namespace API.Controllers
             return null;
         }
 
-        // -----------------------------
-        // ✅ Helper: 6 haneli kod üret
-        // -----------------------------
+        // 6 haneli kod üret
         private static string Generate6DigitCode()
         {
-            // 000000 - 999999
             var bytes = RandomNumberGenerator.GetBytes(4);
             var n = BitConverter.ToUInt32(bytes, 0) % 1_000_000;
             return n.ToString("D6");
         }
 
-        // --------------------------------------------------------
-        // ✅ Helper: Doğrulama kodunu DB’de saklamak için hash’le
-        // (kodun kendisini DB’ye düz yazı kaydetmiyoruz)
-        // --------------------------------------------------------
+        // email + code + salt => SHA256
         private static string HashCode(string emailLower, string code, string salt)
         {
-            // email + code + salt => SHA256
             var raw = $"{emailLower}|{code}|{salt}";
             var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
-            return Convert.ToHexString(hash); // uppercase hex
+            return Convert.ToHexString(hash);
         }
 
+        // reset token hash (forgot password)
+        private static string HashResetToken(string emailLower, string token, string salt)
+        {
+            var raw = $"{emailLower}|{token}|{salt}";
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
+            return Convert.ToHexString(hash);
+        }
+
+        private static string GenerateResetToken()
+        {
+            // URL-safe token
+            var bytes = RandomNumberGenerator.GetBytes(32);
+            return Convert.ToBase64String(bytes)
+                .Replace("+", "-")
+                .Replace("/", "_")
+                .TrimEnd('=');
+        }
+
+        // =========================================================
+        // ✅ 0) FORGOT PASSWORD - KULLANICI VAR MI KONTROL ET
+        // POST /api/Auth/forgot-password/check
+        // =========================================================
+        [HttpPost("forgot-password/check")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ForgotPasswordCheck([FromBody] ForgotPasswordCheckDto dto)
+        {
+            var email = (dto.Email ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(email))
+                return BadRequest(new { message = "E-posta zorunludur." });
+
+            var emailLower = email.ToLowerInvariant();
+
+            var user = await _db.Users.AsNoTracking()
+                .Select(u => new { u.Id, u.Email, u.IsActive })
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == emailLower);
+
+            var hasPendingRequest = await _db.AccountRequests.AsNoTracking()
+                .AnyAsync(r => r.Email.ToLower() == emailLower);
+
+            if (user is null)
+            {
+                return Ok(new { exists = false, hasPendingRequest });
+            }
+
+            return Ok(new { exists = true, isActive = user.IsActive, hasPendingRequest = false });
+        }
+
+        // =========================================================
+        // ✅ 1) FORGOT PASSWORD - KOD GÖNDER
+        // POST /api/Auth/forgot-password/send-code
+        // =========================================================
+        [HttpPost("forgot-password/send-code")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ForgotPasswordSendCode([FromBody] ForgotPasswordSendCodeDto dto)
+        {
+            var email = (dto.Email ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(email))
+                return BadRequest(new { message = "E-posta zorunludur." });
+
+            var emailLower = email.ToLowerInvariant();
+
+            // 1) kullanıcı var mı?
+            var userExists = await _db.Users.AsNoTracking().AnyAsync(u => u.Email.ToLower() == emailLower);
+            if (!userExists)
+            {
+                // İsteğine göre: kayıtlı değilse net söyle
+                return Ok(new { exists = false, message = "Bu e-posta ile kayıtlı kullanıcı bulunamadı." });
+            }
+
+            // 2) kod üret
+            var code = Generate6DigitCode();
+            var salt = Guid.NewGuid().ToString("N");
+            var codeHash = HashCode(emailLower, code, salt);
+            var now = DateTimeOffset.UtcNow;
+            var expiresAt = now.AddMinutes(10);
+
+            // aynı email + purpose için aktif kayıt varsa güncelle
+            var ver = await _db.EmailVerifications
+                .OrderByDescending(x => x.Id)
+                .FirstOrDefaultAsync(x =>
+                    x.Email.ToLower() == emailLower &&
+                    x.Purpose == "forgot_password" &&
+                    x.UsedAt == null &&
+                    x.ExpiresAt > now);
+
+            if (ver is null)
+            {
+                ver = new EmailVerification
+                {
+                    Email = emailLower,
+                    Salt = salt,
+                    CodeHash = codeHash,
+                    CreatedAt = now,
+                    ExpiresAt = expiresAt,
+                    Attempts = 0,
+                    Purpose = "forgot_password",
+                    ResetSalt = null,
+                    ResetHash = null,
+                    UsedAt = null
+                };
+                _db.EmailVerifications.Add(ver);
+            }
+            else
+            {
+                ver.Salt = salt;
+                ver.CodeHash = codeHash;
+                ver.CreatedAt = now;
+                ver.ExpiresAt = expiresAt;
+                ver.Attempts = 0;
+                ver.ResetSalt = null;
+                ver.ResetHash = null;
+                ver.UsedAt = null;
+            }
+
+            await _db.SaveChangesAsync();
+
+            // 3) mail gönder
+            await _email.SendAsync(
+                toEmail: emailLower,
+                subject: "Eğitim Platformu - Şifre Sıfırlama Kodu",
+                htmlBody: $@"
+                    <div style=""font-family:Arial,sans-serif"">
+                      <h3>Şifre Sıfırlama</h3>
+                      <p>Şifre sıfırlama kodunuz:</p>
+                      <div style=""font-size:28px;font-weight:700;letter-spacing:4px"">{code}</div>
+                      <p>Kod <b>10 dakika</b> geçerlidir.</p>
+                    </div>"
+            );
+
+            return Ok(new
+            {
+                exists = true,
+                message = "Şifre sıfırlama kodu gönderildi.",
+                verificationId = ver.Id,
+                expiresAt = ver.ExpiresAt
+            });
+        }
+
+        // =========================================================
+        // ✅ 2) FORGOT PASSWORD - KODU DOĞRULA ve RESET TOKEN ÜRET
+        // POST /api/Auth/forgot-password/verify-code
+        // =========================================================
+        [HttpPost("forgot-password/verify-code")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ForgotPasswordVerifyCode([FromBody] ForgotPasswordVerifyCodeDto dto)
+        {
+            var email = (dto.Email ?? "").Trim().ToLowerInvariant();
+            var code = (dto.Code ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(code))
+                return BadRequest(new { message = "E-posta ve kod zorunludur." });
+
+            var now = DateTimeOffset.UtcNow;
+
+            var ver = await _db.EmailVerifications
+                .FirstOrDefaultAsync(x =>
+                    x.Id == dto.VerificationId &&
+                    x.Email.ToLower() == email &&
+                    x.Purpose == "forgot_password");
+
+            if (ver is null)
+                return NotFound(new { message = "Doğrulama kaydı bulunamadı." });
+
+            if (ver.UsedAt != null)
+                return Ok(new { message = "Kod zaten kullanılmış." });
+
+            if (ver.ExpiresAt <= now)
+                return BadRequest(new { message = "Kod süresi doldu. Tekrar kod isteyin." });
+
+            if (ver.Attempts >= 5)
+                return BadRequest(new { message = "Çok fazla deneme yapıldı. Yeni kod isteyin." });
+
+            var expected = HashCode(email, code, ver.Salt);
+            if (!string.Equals(expected, ver.CodeHash, StringComparison.OrdinalIgnoreCase))
+            {
+                ver.Attempts += 1;
+                await _db.SaveChangesAsync();
+                return BadRequest(new { message = "Kod hatalı." });
+            }
+
+            // ✅ Kod doğru -> reset token üret (UI bunu saklayacak ve reset endpointine gönderecek)
+            var resetToken = GenerateResetToken();
+            var resetSalt = Guid.NewGuid().ToString("N");
+            var resetHash = HashResetToken(email, resetToken, resetSalt);
+
+            ver.ResetSalt = resetSalt;
+            ver.ResetHash = resetHash;
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Kod doğrulandı. Yeni şifre belirleyebilirsiniz.",
+                verificationId = ver.Id,
+                resetToken = resetToken
+            });
+        }
+
+        // =========================================================
+        // ✅ 3) FORGOT PASSWORD - YENİ ŞİFRE BELİRLE
+        // POST /api/Auth/forgot-password/reset
+        // =========================================================
+        [HttpPost("forgot-password/reset")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ForgotPasswordReset([FromBody] ForgotPasswordResetDto dto)
+        {
+            var email = (dto.Email ?? "").Trim().ToLowerInvariant();
+            var resetToken = (dto.ResetToken ?? "").Trim();
+            var newPassword = dto.NewPassword ?? "";
+
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(resetToken) || string.IsNullOrWhiteSpace(newPassword))
+                return BadRequest(new { message = "E-posta, reset token ve yeni şifre zorunludur." });
+
+            var now = DateTimeOffset.UtcNow;
+
+            var ver = await _db.EmailVerifications
+                .FirstOrDefaultAsync(x =>
+                    x.Id == dto.VerificationId &&
+                    x.Email.ToLower() == email &&
+                    x.Purpose == "forgot_password");
+
+            if (ver is null)
+                return NotFound(new { message = "Doğrulama kaydı bulunamadı." });
+
+            if (ver.UsedAt != null)
+                return BadRequest(new { message = "Bu sıfırlama bağlantısı/kodu zaten kullanılmış." });
+
+            if (ver.ExpiresAt <= now)
+                return BadRequest(new { message = "Sıfırlama süresi doldu. Tekrar kod isteyin." });
+
+            if (string.IsNullOrWhiteSpace(ver.ResetSalt) || string.IsNullOrWhiteSpace(ver.ResetHash))
+                return BadRequest(new { message = "Önce kod doğrulaması yapmalısınız." });
+
+            var expectedReset = HashResetToken(email, resetToken, ver.ResetSalt);
+            if (!string.Equals(expectedReset, ver.ResetHash, StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { message = "Reset token geçersiz." });
+
+            // kullanıcıyı bul
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email);
+            if (user is null)
+                return NotFound(new { message = "Kullanıcı bulunamadı." });
+
+            // şifre güncelle
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            user.MustChangePassword = false; // istersen true da bırakabilirsin
+
+            // bu doğrulama kaydını kullanıldı işaretle
+            ver.UsedAt = now;
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new { message = "Şifre başarıyla güncellendi. Giriş yapabilirsiniz." });
+        }
+
+        // =========================================================
         // ✅ Profil (me)
+        // =========================================================
         [HttpGet("me")]
         [Authorize]
         public async Task<IActionResult> Me()
@@ -110,24 +359,25 @@ namespace API.Controllers
 
             var emailLower = email.ToLowerInvariant();
 
-            // Mail zaten kullanımdaysa (user ya da pending request) kod göndermeyelim
             if (await _db.Users.AnyAsync(x => x.Email.ToLower() == emailLower) ||
                 await _db.AccountRequests.AnyAsync(x => x.Email.ToLower() == emailLower))
             {
                 return Conflict(new { message = "Bu e-posta kullanımda." });
             }
 
-            // Kod üret
             var code = Generate6DigitCode();
             var salt = Guid.NewGuid().ToString("N");
             var codeHash = HashCode(emailLower, code, salt);
             var now = DateTimeOffset.UtcNow;
             var expiresAt = now.AddMinutes(10);
 
-            // Aynı mail için aktif (expire olmamış) bir kayıt varsa güncelle
             var ver = await _db.EmailVerifications
                 .OrderByDescending(x => x.Id)
-                .FirstOrDefaultAsync(x => x.Email.ToLower() == emailLower && x.VerifiedAt == null && x.ExpiresAt > now);
+                .FirstOrDefaultAsync(x =>
+                    x.Email.ToLower() == emailLower &&
+                    x.Purpose == "register" &&
+                    x.UsedAt == null &&
+                    x.ExpiresAt > now);
 
             if (ver is null)
             {
@@ -139,7 +389,10 @@ namespace API.Controllers
                     CreatedAt = now,
                     ExpiresAt = expiresAt,
                     Attempts = 0,
-                    VerifiedAt = null
+                    Purpose = "register",
+                    ResetSalt = null,
+                    ResetHash = null,
+                    UsedAt = null
                 };
                 _db.EmailVerifications.Add(ver);
             }
@@ -150,13 +403,13 @@ namespace API.Controllers
                 ver.CreatedAt = now;
                 ver.ExpiresAt = expiresAt;
                 ver.Attempts = 0;
-                ver.VerifiedAt = null;
+                ver.ResetSalt = null;
+                ver.ResetHash = null;
+                ver.UsedAt = null;
             }
 
             await _db.SaveChangesAsync();
 
-            // ✅ Mail gönder
-            // Subject ve body’yi istediğin gibi tasarlayabilirsin
             await _email.SendAsync(
                 toEmail: emailLower,
                 subject: "Eğitim Platformu - Doğrulama Kodu",
@@ -178,7 +431,7 @@ namespace API.Controllers
         }
 
         // =========================================================
-        // ✅ 2) REGISTER KODUNU DOĞRULA
+        // ✅ 2) REGISTER KODUNU DOĞRULA (UsedAt set)
         // POST /api/Auth/verify-register-code
         // =========================================================
         [HttpPost("verify-register-code")]
@@ -194,18 +447,20 @@ namespace API.Controllers
             var now = DateTimeOffset.UtcNow;
 
             var ver = await _db.EmailVerifications
-                .FirstOrDefaultAsync(x => x.Id == dto.VerificationId && x.Email.ToLower() == email);
+                .FirstOrDefaultAsync(x =>
+                    x.Id == dto.VerificationId &&
+                    x.Email.ToLower() == email &&
+                    x.Purpose == "register");
 
             if (ver is null)
                 return NotFound(new { message = "Doğrulama kaydı bulunamadı." });
 
-            if (ver.VerifiedAt != null)
+            if (ver.UsedAt != null)
                 return Ok(new { message = "E-posta zaten doğrulandı." });
 
             if (ver.ExpiresAt <= now)
                 return BadRequest(new { message = "Doğrulama kodu süresi doldu. Tekrar kod isteyin." });
 
-            // Basit brute-force önlemi
             if (ver.Attempts >= 5)
                 return BadRequest(new { message = "Çok fazla deneme yapıldı. Yeni kod isteyin." });
 
@@ -217,7 +472,8 @@ namespace API.Controllers
                 return BadRequest(new { message = "Kod hatalı." });
             }
 
-            ver.VerifiedAt = now;
+            // ✅ doğrulandı işareti
+            ver.UsedAt = now;
             await _db.SaveChangesAsync();
 
             return Ok(new { message = "E-posta doğrulandı." });
@@ -225,7 +481,7 @@ namespace API.Controllers
 
         // =========================================================
         // ✅ REGISTER (Mevcut endpoint korunuyor)
-        // Burada artık "mail doğrulandı mı?" kontrolü var
+        // Burada artık "mail doğrulandı mı?" kontrolü: UsedAt
         // =========================================================
         [HttpPost("register")]
         [AllowAnonymous]
@@ -243,14 +499,16 @@ namespace API.Controllers
                 return Conflict(new { message = "Bu e-posta kullanımda." });
             }
 
-            // ✅ E-POSTA DOĞRULAMA ZORUNLU
-            // Kullanıcı register formunda önce kod doğrulamadan devam edemez.
+            // ✅ E-POSTA DOĞRULAMA ZORUNLU (UsedAt üzerinden)
             var now = DateTimeOffset.UtcNow;
-            var verified = await _db.EmailVerifications
-                .AnyAsync(x =>
-                    x.Email.ToLower() == emailLower &&
-                    x.VerifiedAt != null &&
-                    x.VerifiedAt > now.AddMinutes(-30)); // doğrulama 30 dk içinde yapılmış olsun
+            var threshold = now.AddMinutes(-30);
+
+            var verified = await _db.EmailVerifications.AnyAsync(x =>
+                x.Email.ToLower() == emailLower &&
+                x.Purpose == "register" &&
+                x.UsedAt.HasValue &&
+                x.UsedAt.Value > threshold
+            );
 
             if (!verified)
                 return BadRequest(new { message = "E-posta doğrulanmadı. Lütfen doğrulama kodunu onaylayın." });
@@ -279,7 +537,9 @@ namespace API.Controllers
             });
         }
 
-        // LOGIN aynı kalıyor
+        // =========================================================
+        // LOGIN (aynı)
+        // =========================================================
         [HttpPost("login")]
         [AllowAnonymous]
         public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest dto)

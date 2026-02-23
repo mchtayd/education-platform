@@ -24,6 +24,7 @@ import AdminSettings from "../pages/admin/AdminSettings";
 import AdminUsers from "../pages/admin/AdminUsers";
 import AdminProfile from "../pages/admin/AdminProfile";
 import AdminIndexRedirect from "../pages/admin/AdminIndexRedirect";
+import AdminAiContent from "../pages/admin/AdminAiContent";
 
 // User portal
 import UserLayout from "../layouts/UserLayout";
@@ -67,6 +68,14 @@ export const router = createBrowserRouter([
       { path: "exams/take/:attemptId", element: <UserExamTake /> },
 
       { path: "messages", element: <UserMessages /> },
+      {
+        path: "ai-content",
+        element: (
+          <RoleGuard allow={["user"]}>
+            <AdminAiContent />
+          </RoleGuard>
+        ),
+      },
     ],
   },
 
@@ -108,6 +117,14 @@ export const router = createBrowserRouter([
           </RoleGuard>
         ),
       },
+      {
+  path: "ai-content",
+  element: (
+    <RoleGuard allow={["admin", "trainer", "educator"]}>
+      <AdminAiContent />
+    </RoleGuard>
+  ),
+},
     ],
   },
 

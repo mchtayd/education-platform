@@ -24,6 +24,23 @@ namespace API.Controllers
         // ✅ Attempt özelinde kullanıcıya mesaj göndermek için
         public record SendAttemptMessageDto(string message);
 
+        private static string? NormalizeImageUrl(string? url)
+{
+    if (string.IsNullOrWhiteSpace(url)) return null;
+
+    var s = url.Trim().Replace("\\", "/");
+
+    // Fiziksel path geldiyse /wwwroot sonrası web path'e çevir
+    var idx = s.IndexOf("/wwwroot/", StringComparison.OrdinalIgnoreCase);
+    if (idx >= 0)
+        s = s[(idx + "/wwwroot".Length)..]; // "/uploads/..."
+
+    if (!s.StartsWith("/") && !s.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        s = "/" + s;
+
+    return s;
+}
+
         private int CurrentUserId()
 {
     var keys = new[] { ClaimTypes.NameIdentifier, "nameid", "sub", "id", "userId" };
@@ -126,7 +143,7 @@ namespace API.Controllers
                     qq.Choices.Add(new ExamChoice
                     {
                         Text = string.IsNullOrWhiteSpace(c.text) ? null : c.text!.Trim(),
-                        ImageUrl = string.IsNullOrWhiteSpace(c.imageUrl) ? null : c.imageUrl,
+                        ImageUrl = NormalizeImageUrl(c.imageUrl),
                         IsCorrect = c.isCorrect
                     });
                 }
@@ -139,6 +156,85 @@ namespace API.Controllers
             await _db.SaveChangesAsync();
             return Ok(new { exam.Id });
         }
+
+        // ============== UPDATE ==============
+[HttpPut("{id:int}")]
+public async Task<IActionResult> Update(int id, [FromBody] CreateExamDto dto)
+{
+    var exam = await _db.Exams.FirstOrDefaultAsync(x => x.Id == id);
+    if (exam is null)
+        return NotFound(new { message = "Sınav bulunamadı." });
+
+    if (string.IsNullOrWhiteSpace(dto.title))
+        return BadRequest(new { message = "Sınav başlığı zorunlu." });
+
+    if (dto.questions == null || dto.questions.Length == 0)
+        return BadRequest(new { message = "En az 1 soru ekleyin." });
+
+    foreach (var q in dto.questions)
+    {
+        if (string.IsNullOrWhiteSpace(q.text))
+            return BadRequest(new { message = "Soru metni boş olamaz." });
+
+        if (q.choices == null || q.choices.Length != 4)
+            return BadRequest(new { message = "Her soru için 4 şık gereklidir." });
+
+        if (!q.choices.Any(x => x.isCorrect))
+            return BadRequest(new { message = "Her soruda en az 1 doğru şık olmalıdır." });
+    }
+
+    // Güvenlik: attempt varsa soru/şık değişimi geçmişi bozar
+    var hasAttempts = await _db.ExamAttempts.AsNoTracking().AnyAsync(a => a.ExamId == id);
+    if (hasAttempts)
+    {
+        return Conflict(new
+        {
+            message = "Bu sınav için kullanıcı denemeleri mevcut. Soruları değiştirmek geçmiş kayıtları bozabilir. Yeni sınav oluşturmanız önerilir."
+        });
+    }
+
+    exam.Title = dto.title.Trim();
+    exam.ProjectId = dto.projectId;
+    exam.DurationMinutes = Math.Max(1, dto.durationMinutes);
+
+    // Mevcut soruları/şıkları silip yeniden yaz (simple & clean)
+    var questionIds = await _db.ExamQuestions
+        .Where(q => q.ExamId == id)
+        .Select(q => q.Id)
+        .ToListAsync();
+
+    if (questionIds.Count > 0)
+    {
+        _db.ExamChoices.RemoveRange(_db.ExamChoices.Where(c => questionIds.Contains(c.QuestionId)));
+        _db.ExamQuestions.RemoveRange(_db.ExamQuestions.Where(q => q.ExamId == id));
+    }
+
+    int order = 1;
+    foreach (var q in dto.questions)
+    {
+        var qq = new ExamQuestion
+        {
+            ExamId = exam.Id,
+            Text = q.text.Trim(),
+            Order = order++
+        };
+
+        foreach (var c in q.choices)
+        {
+            qq.Choices.Add(new ExamChoice
+            {
+                Text = string.IsNullOrWhiteSpace(c.text) ? null : c.text!.Trim(),
+                ImageUrl = NormalizeImageUrl(c.imageUrl),
+                IsCorrect = c.isCorrect
+            });
+        }
+
+        _db.ExamQuestions.Add(qq);
+    }
+
+    await _db.SaveChangesAsync();
+    return Ok(new { exam.Id });
+}
 
         // ============== LIST ==============
         [HttpGet]
@@ -182,9 +278,10 @@ namespace API.Controllers
                            q.Id,
                            q.Text,
                            choices = _db.ExamChoices
-                               .Where(c => c.QuestionId == q.Id)
-                               .Select(c => new { c.Id, c.Text, c.ImageUrl, c.IsCorrect })
-                               .ToList()
+    .Where(c => c.QuestionId == q.Id)
+    .OrderBy(c => c.Id)
+    .Select(c => new { c.Id, c.Text, c.ImageUrl, c.IsCorrect })
+    .ToList()
                        }).ToListAsync();
 
             return Ok(new
@@ -293,6 +390,7 @@ public async Task<IActionResult> Delete(int id)
                     text = q.Text,
                     choices = _db.ExamChoices.AsNoTracking()
                         .Where(c => c.QuestionId == q.Id)
+                        .OrderBy(c => c.Id)
                         .Select(c => new { c.Id, c.Text, c.ImageUrl, c.IsCorrect })
                         .ToList()
                 })

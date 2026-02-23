@@ -9,6 +9,8 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
 using Microsoft.AspNetCore.Http.Features;
+using API.Options;
+using Microsoft.Extensions.Options;
 
 // ✅ EKLENDİ
 using Microsoft.Extensions.FileProviders;
@@ -21,6 +23,38 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
     var cs = builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException("DefaultConnection not found");
     opt.UseNpgsql(cs);
+});
+
+builder.Services.Configure<OllamaOptions>(builder.Configuration.GetSection("Ollama"));
+builder.Services.AddHttpClient<OllamaClient>((sp, client) =>
+{
+    var opt = sp.GetRequiredService<IOptions<OllamaOptions>>().Value;
+    client.BaseAddress = new Uri(opt.BaseUrl);
+    client.Timeout = TimeSpan.FromMinutes(5);
+});
+
+builder.Services.AddSingleton<PdfTextExtractor>();
+builder.Services.AddScoped<AiRagService>();
+
+// ---------- AI Providers (Ollama + Gemini) ----------
+builder.Services.Configure<AiProviderOptions>(builder.Configuration.GetSection("AI"));
+builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection("Gemini"));
+
+// Mevcut Ollama client'in aynen kalıyor
+builder.Services.Configure<OllamaOptions>(builder.Configuration.GetSection("Ollama"));
+builder.Services.AddHttpClient<OllamaClient>((sp, client) =>
+{
+    var opt = sp.GetRequiredService<IOptions<OllamaOptions>>().Value;
+    client.BaseAddress = new Uri(opt.BaseUrl);
+    client.Timeout = TimeSpan.FromMinutes(5);
+});
+
+// ✅ Yeni Gemini client
+builder.Services.AddHttpClient<GeminiClient>((sp, client) =>
+{
+    var opt = sp.GetRequiredService<IOptions<GeminiOptions>>().Value;
+    client.BaseAddress = new Uri(opt.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(opt.TimeoutSeconds <= 0 ? 120 : opt.TimeoutSeconds);
 });
 
 // ---------- CORS ----------
@@ -38,6 +72,13 @@ builder.Services.AddCors(opt =>
     );
 });
 
+
+// Provider implementations
+builder.Services.AddScoped<OllamaAiProvider>();
+builder.Services.AddScoped<GeminiAiProvider>();
+builder.Services.AddScoped<IAiProviderFactory, AiProviderFactory>();
+
+
 // ---------- JWT ----------
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddScoped<ITokenService, TokenService>();
@@ -45,14 +86,29 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddHostedService<TrainingAutoUnpublishService>();
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 
-var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>()!;
+// ✅ EKLENDİ: Jwt:Key byte uzunluk doğrulaması (HS256 min 16 byte)
+var jwtSection = builder.Configuration.GetSection("Jwt");
+var jwtKey = jwtSection["Key"] ?? "";
+var jwtKeyBytes = Encoding.UTF8.GetBytes(jwtKey);
+
+if (jwtKeyBytes.Length < 16)
+{
+    throw new InvalidOperationException(
+        $"Jwt:Key en az 16 byte olmalı (HS256). Şu an: {jwtKeyBytes.Length} byte. " +
+        $"(Muhtemelen Environment Variable veya dotnet user-secrets override ediyor)"
+    );
+}
+
+// ✅ mevcut yapıyı bozmadan: JwtOptions yine bind ediliyor
+var jwt = jwtSection.Get<JwtOptions>()!;
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {
         o.TokenValidationParameters = new()
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
+            IssuerSigningKey = new SymmetricSecurityKey(jwtKeyBytes), // ✅ değişti: jwt.Key yerine doğrulanmış bytes
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidIssuer = jwt.Issuer,
@@ -98,7 +154,6 @@ builder.Services.AddSwaggerGen(c =>
         Description = "Bearer {token}"
     });
 
-    // ✅ HATA DÜZELTİLDİ: OpenApiReference.Reference yok
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -157,23 +212,18 @@ if (app.Environment.IsDevelopment())
 
 // app.UseHttpsRedirection();
 
-
 // ✅ STATIC FILES GARANTİSİ (mevcut yapıyı bozmadan)
-// app.UseStaticFiles();  // ❌ BUNU KALDIRDIK
-
 var webRoot = app.Environment.WebRootPath;
 if (string.IsNullOrWhiteSpace(webRoot))
     webRoot = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 
-// Docker / prod’da klasör yoksa oluştur (static middleware'in boş kalmasını engeller)
 Directory.CreateDirectory(webRoot);
 Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "trainings"));
 
-// wwwroot altını (özellikle /uploads/...) servis et
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(webRoot),
-    RequestPath = ""   // kökten servis: /uploads/... çalışır
+    RequestPath = ""
 });
 
 app.UseRouting();
@@ -184,7 +234,6 @@ app.UseCors(ClientCors);
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Endpoint mapping
 app.MapControllers().RequireCors(ClientCors);
 app.MapHub<AnalysisHub>("/hubs/analysis").RequireCors(ClientCors);
 

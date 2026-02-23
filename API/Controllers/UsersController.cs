@@ -529,13 +529,19 @@ catch
             return Conflict(new { message = "Bu e-posta kullanımda." });
 
         var role = NormRole(body.Role);
-        if (!IsValidRole(role))
-            return BadRequest(new { message = "Geçersiz rol." });
+if (!IsValidRole(role))
+    return BadRequest(new { message = "Geçersiz rol." });
 
-        var ids = NormalizeProjectIds(body.ProjectId, body.ProjectIds);
-        var (valid, hasInvalid) = await ValidateProjectIdsAsync(ids);
-        if (hasInvalid)
-            return BadRequest(new { message = "Seçilen projelerden bazıları geçersiz." });
+var ids = NormalizeProjectIds(body.ProjectId, body.ProjectIds);
+var (valid, hasInvalid) = await ValidateProjectIdsAsync(ids);
+if (hasInvalid)
+    return BadRequest(new { message = "Seçilen projelerden bazıları geçersiz." });
+
+// ✅ Admin ise proje bağlama/primary proje yok
+if (role == "admin")
+{
+    valid = new List<int>();
+}
 
         var now = DateTimeOffset.UtcNow;
         var hash = BCrypt.Net.BCrypt.HashPassword(pw);

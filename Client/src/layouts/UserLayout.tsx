@@ -25,6 +25,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../lib/api";
+import SmartToyIcon from "@mui/icons-material/SmartToy";
 
 type Category = { id: number; name: string; count: number; watched: number };
 
@@ -271,6 +272,20 @@ export default function UserLayout() {
               </ListItemButton>
             ))
           )}
+
+          <ListItemButton
+  selected={location.pathname === "/app/ai-content"}
+  onClick={() => {
+    navigate("/app/ai-content");
+    setOpenDrawer(false);
+  }}
+>
+  <ListItemIcon>
+    <SmartToyIcon />
+  </ListItemIcon>
+  <ListItemText primary="AI İçerik Sorgulama" />
+</ListItemButton>
+          
         </List>
       </Drawer>
 

@@ -6,13 +6,14 @@ import {
   FormControl, InputLabel, Typography, ToggleButtonGroup, ToggleButton,
   Divider
 } from "@mui/material";
-import { Add, Delete, Image, Refresh, Search, Visibility } from "@mui/icons-material";
+import { Add, Delete, Image, Refresh, Search, Visibility, Edit } from "@mui/icons-material";
 import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import api from "../../lib/api";
 import { Autocomplete } from "@mui/material";
 import { fullApiUrl } from "../../lib/fullUrl";
 import { useAuth } from "../../context/AuthContext";
+
 
 type Project = { id: number; name: string };
 type UserItem = { id: number; fullName: string; email: string };
@@ -82,7 +83,103 @@ export default function AdminExam() {
   const [selProject, setSelProject] = useState<Project | null>(null);
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
   const [assignSearch, setAssignSearch] = useState("");
+  const [editingQuestionIndex, setEditingQuestionIndex] = useState<number | null>(null);
 
+  const [editingExamId, setEditingExamId] = useState<number | null>(null);
+
+  const resetExamForm = () => {
+  setEditingExamId(null);
+  setTitle("");
+  setDuration(30);
+  setDefaultProject("");
+  setQText("");
+  setQChoices(blankChoices());
+  setQuestions([]);
+  setEditingQuestionIndex(null);
+};
+
+const resetQuestionForm = () => {
+  setEditingQuestionIndex(null);
+  setQText("");
+  setQChoices(blankChoices());
+};
+
+const editQuestion = (idx: number) => {
+  const q = questions[idx];
+  if (!q) return;
+
+  setEditingQuestionIndex(idx);
+  setQText(q.text || "");
+
+  // 4 şık garanti edecek şekilde normalize et
+  const normalized = [...(q.choices || [])].map((c) => ({
+    text: c.text || "",
+    imageUrl: c.imageUrl || null,
+    isCorrect: !!c.isCorrect,
+  }));
+
+  while (normalized.length < 4) {
+    normalized.push({ text: "", imageUrl: null, isCorrect: false });
+  }
+
+  setQChoices(normalized.slice(0, 4));
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
+  const choiceImageSrc = (url?: string | null) => {
+  if (!url) return "";
+
+  let s = String(url).trim().replace(/\\/g, "/");
+
+  // Eğer absolute url ise direkt dön
+  if (/^https?:\/\//i.test(s)) return s;
+
+  // Eğer yanlışlıkla fiziksel path geldiyse wwwroot sonrası kısmı al
+  const lower = s.toLowerCase();
+  const w = lower.indexOf("/wwwroot/");
+  if (w >= 0) {
+    s = s.substring(w + "/wwwroot".length); // "/uploads/..."
+  } else if (lower.startsWith("wwwroot/")) {
+    s = s.substring("wwwroot".length); // "/uploads/..."
+  }
+
+  // Baştaki slash garanti olsun
+  if (!s.startsWith("/")) s = "/" + s;
+
+  return fullApiUrl(s);
+};
+
+const startEditExam = async (id: number) => {
+  try {
+    const { data } = await api.get<ExamDetail>(`/Exams/${id}`);
+
+    setEditingExamId(data.id);
+    setTitle(data.title || "");
+    setDuration(data.durationMinutes || 30);
+    setDefaultProject((data.projectId ?? "") as any);
+
+    setQuestions(
+      (data.questions || []).map((q) => ({
+        text: q.text || "",
+        choices: (q.choices || []).map((c) => ({
+          text: c.text || "",
+          imageUrl: c.imageUrl || null,
+          isCorrect: !!c.isCorrect,
+        })),
+      }))
+    );
+
+    setQText("");
+setQChoices(blankChoices());
+setEditingQuestionIndex(null);
+setTab(0);
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    notify("Sınav düzenleme modunda açıldı.", "info");
+  } catch (e: any) {
+    notify(e?.response?.data?.message || "Sınav düzenleme için açılamadı.", "error");
+  }
+};
   // ---- Control ----
   type AttemptRow = { id: number; examId: number; examTitle: string; user: string; startedAt: string; submittedAt: string; score?: number | null; isPassed?: boolean | null };
   const [attempts, setAttempts] = useState<AttemptRow[]>([]);
@@ -100,15 +197,52 @@ export default function AdminExam() {
   };
 
   const addQuestion = () => {
-    if (!qText.trim()) { notify("Soru metni boş olamaz.", "error"); return; }
-    if (qChoices.length !== 4 || !qChoices.some(c => c.isCorrect)) { notify("4 şık ve en az bir doğru şık seçilmelidir.", "error"); return; }
+  if (!qText.trim()) {
+    notify("Soru metni boş olamaz.", "error");
+    return;
+  }
 
-    setQuestions(prev => [...prev, { text: qText.trim(), choices: qChoices.map(c => ({ text: c.text?.trim(), imageUrl: c.imageUrl || null, isCorrect: !!c.isCorrect })) }]);
-    setQText("");
-    setQChoices(blankChoices());
+  if (qChoices.length !== 4 || !qChoices.some(c => c.isCorrect)) {
+    notify("4 şık ve en az bir doğru şık seçilmelidir.", "error");
+    return;
+  }
+
+  const payloadQuestion: Question = {
+    text: qText.trim(),
+    choices: qChoices.map(c => ({
+      text: c.text?.trim(),
+      imageUrl: c.imageUrl || null,
+      isCorrect: !!c.isCorrect
+    }))
   };
 
-  const removeQuestion = (idx: number) => setQuestions(qs => qs.filter((_, i) => i !== idx));
+  if (editingQuestionIndex !== null) {
+    setQuestions(prev =>
+      prev.map((q, i) => (i === editingQuestionIndex ? payloadQuestion : q))
+    );
+    notify("Soru güncellendi.", "success");
+  } else {
+    setQuestions(prev => [...prev, payloadQuestion]);
+    notify("Soru eklendi.", "success");
+  }
+
+  resetQuestionForm();
+};
+
+  const removeQuestion = (idx: number) => {
+  setQuestions(prev => prev.filter((_, i) => i !== idx));
+
+  // Eğer düzenlenen soru silindiyse formu temizle
+  if (editingQuestionIndex === idx) {
+    resetQuestionForm();
+    return;
+  }
+
+  // Düzenlenen soru, silinenin sonrasındaysa index bir azalır
+  if (editingQuestionIndex !== null && idx < editingQuestionIndex) {
+    setEditingQuestionIndex(editingQuestionIndex - 1);
+  }
+};
 
   // ---- Review Dialog ----
   const [reviewDlg, setReviewDlg] = useState<{ open: boolean; loading: boolean; data?: AttemptReview }>({ open: false, loading: false });
@@ -170,29 +304,38 @@ export default function AdminExam() {
 };
 
   const saveExam = async () => {
-    // saveExam fonksiyonunun başına:
-    if (isEducator && !defaultProject) {
-      notify("Eğitmen hesabı için proje seçimi zorunludur.", "error");
+  if (isEducator && !defaultProject) {
+    notify("Eğitmen hesabı için proje seçimi zorunludur.", "error");
     return;
   }
 
-    if (!title.trim()) { notify("Başlık zorunlu.", "error"); return; }
-    if (questions.length === 0) { notify("En az 1 soru ekleyin.", "error"); return; }
-    try {
-      await api.post("/Exams", {
-        title: title.trim(),
-        projectId: defaultProject || null,
-        durationMinutes: duration,
-        questions
-      });
-      setTitle(""); setDuration(30); setDefaultProject(""); setQuestions([]);
-      notify("Sınav kaydedildi.");
-      if (tab !== 1) setTab(1);
-      await loadExams();
-    } catch (e: any) {
-      notify(e?.response?.data || "Sınav kaydedilemedi.", "error");
+  if (!title.trim()) { notify("Başlık zorunlu.", "error"); return; }
+  if (questions.length === 0) { notify("En az 1 soru ekleyin.", "error"); return; }
+
+  try {
+    const payload = {
+      title: title.trim(),
+      projectId: defaultProject || null,
+      durationMinutes: duration,
+      questions
+    };
+
+    if (editingExamId) {
+      await api.put(`/Exams/${editingExamId}`, payload);
+      notify("Sınav güncellendi.", "success");
+    } else {
+      await api.post("/Exams", payload);
+      notify("Sınav kaydedildi.", "success");
     }
-  };
+
+    resetExamForm();
+
+    if (tab !== 1) setTab(1);
+    await loadExams();
+  } catch (e: any) {
+    notify(e?.response?.data?.message || e?.response?.data || "Sınav kaydedilemedi/güncellenemedi.", "error");
+  }
+};
 
   // ---- Loads ----
   const loadProjects = async () => {
@@ -287,7 +430,16 @@ export default function AdminExam() {
 
         {tab === 0 && (
           <Stack spacing={2} sx={{ mt: 2 }}>
+            {editingExamId && (
+  <Alert severity="info" sx={{ mb: 1 }}>
+    Düzenleme modu: <b>#{editingExamId}</b> — değişiklikleri kaydedince mevcut sınav güncellenir.
+    <Button size="small" sx={{ ml: 1 }} onClick={resetExamForm}>
+      Düzenlemeyi İptal Et
+    </Button>
+  </Alert>
+)}
             <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+              
               <TextField label="Sınav Başlığı" fullWidth value={title} onChange={e => setTitle(e.target.value)} />
               <TextField label="Süre (dk)" type="number" sx={{ width: 140 }} value={duration} onChange={e => setDuration(parseInt(e.target.value || "0") || 0)} />
               <FormControl sx={{ minWidth: 220 }}>
@@ -302,6 +454,14 @@ export default function AdminExam() {
             {/* Soru ekleme */}
             <Paper variant="outlined" sx={{ p: 2 }}>
               <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>Soru</Typography>
+              {editingQuestionIndex !== null && (
+  <Alert severity="info" sx={{ mb: 2 }}>
+    Soru düzenleme modu: <b>{editingQuestionIndex + 1}. soru</b>
+    <Button size="small" sx={{ ml: 1 }} onClick={resetQuestionForm}>
+      İptal
+    </Button>
+  </Alert>
+)}
               <TextField multiline minRows={2} fullWidth placeholder="Soru metni" value={qText} onChange={e => setQText(e.target.value)} sx={{ mb: 2 }} />
               <Stack spacing={1.5}>
                 {qChoices.map((c, idx) => (
@@ -334,7 +494,7 @@ export default function AdminExam() {
                       <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 1 }}>
                         <Box
                           component="img"
-                          src={fullApiUrl(c.imageUrl)}
+                          src={choiceImageSrc(c.imageUrl)}
                           alt="şık görseli"
                           sx={{
                             width: 44,
@@ -348,7 +508,7 @@ export default function AdminExam() {
                         <Button
                           size="small"
                           component="a"
-                          href={fullApiUrl(c.imageUrl)}
+                          href={choiceImageSrc(c.imageUrl)}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
@@ -361,7 +521,20 @@ export default function AdminExam() {
               </Stack>
 
               <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                <Button startIcon={<Add />} onClick={addQuestion}>Soruyu Ekle</Button>
+                <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mt: 2 }}>
+  {editingQuestionIndex !== null && (
+    <Button color="inherit" onClick={resetQuestionForm}>
+      İptal
+    </Button>
+  )}
+
+  <Button
+    startIcon={editingQuestionIndex !== null ? <Edit /> : <Add />}
+    onClick={addQuestion}
+  >
+    {editingQuestionIndex !== null ? "Soruyu Güncelle" : "Soruyu Ekle"}
+  </Button>
+</Stack>
               </Stack>
             </Paper>
 
@@ -383,7 +556,19 @@ export default function AdminExam() {
                       <TableCell>{q.text}</TableCell>
                       <TableCell>{["A", "B", "C", "D"][q.choices.findIndex(c => c.isCorrect)]}</TableCell>
                       <TableCell align="right">
-                        <IconButton color="error" onClick={() => removeQuestion(i)}><Delete /></IconButton>
+                        <TableCell align="right">
+  <Tooltip title="Soruyu Düzenle">
+    <IconButton color="primary" onClick={() => editQuestion(i)}>
+      <Edit />
+    </IconButton>
+  </Tooltip>
+
+  <Tooltip title="Soruyu Sil">
+    <IconButton color="error" onClick={() => removeQuestion(i)}>
+      <Delete />
+    </IconButton>
+  </Tooltip>
+</TableCell>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -393,7 +578,9 @@ export default function AdminExam() {
             </Paper>
 
             <Stack direction="row" justifyContent="flex-end">
-              <Button variant="contained" onClick={saveExam}>Sınavı Kaydet</Button>
+              <Button variant="contained" onClick={saveExam}>
+  {editingExamId ? "Sınavı Güncelle" : "Sınavı Kaydet"}
+</Button>
             </Stack>
           </Stack>
         )}
@@ -428,6 +615,12 @@ export default function AdminExam() {
   <Tooltip title="Soruları Gör">
     <IconButton onClick={() => openDetail(e.id)}>
       <Visibility />
+    </IconButton>
+  </Tooltip>
+
+  <Tooltip title="Sınavı Düzenle">
+    <IconButton color="primary" onClick={() => startEditExam(e.id)}>
+      <Edit />
     </IconButton>
   </Tooltip>
 
@@ -573,14 +766,14 @@ export default function AdminExam() {
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Box
                           component="img"
-                          src={fullApiUrl(c.imageUrl)}
+                          src={choiceImageSrc(c.imageUrl)}
                           alt="şık görseli"
                           sx={{ width: 80, height: 52, objectFit: "contain", border: 1, borderColor: "divider", borderRadius: 1 }}
                         />
                         <Button
                           size="small"
                           component="a"
-                          href={fullApiUrl(c.imageUrl)}
+                          href={choiceImageSrc(c.imageUrl)}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
@@ -671,14 +864,14 @@ export default function AdminExam() {
                             <Stack direction="row" spacing={1} alignItems="center">
                               <Box
                                 component="img"
-                                src={fullApiUrl(c.imageUrl)}
+                                src={choiceImageSrc(c.imageUrl)}
                                 alt="şık görseli"
                                 sx={{ width: 80, height: 52, objectFit: "contain", border: 1, borderColor: "divider", borderRadius: 1 }}
                               />
                               <Button
                                 size="small"
                                 component="a"
-                                href={fullApiUrl(c.imageUrl)}
+                                href={choiceImageSrc(c.imageUrl)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >

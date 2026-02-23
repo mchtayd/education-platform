@@ -120,6 +120,8 @@ export default function AdminUsers() {
     projectIds: [] as number[],
   });
 
+  const isAdminCreate = createForm.role === "admin";
+
   // edit dialog
   const [editOpen, setEditOpen] = useState(false);
   const [editUser, setEditUser] = useState<null | {
@@ -180,6 +182,14 @@ export default function AdminUsers() {
     if (currentTab === "users") loadUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTab]);
+
+  // ✅ Admin seçilirse proje seçimini sıfırla
+useEffect(() => {
+  if (createForm.role === "admin" && createForm.projectIds.length > 0) {
+    setCreateForm((s) => ({ ...s, projectIds: [] }));
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [createForm.role]);
 
   // ---------- Project dialog ----------
   const openProjectDialog = () => {
@@ -708,6 +718,7 @@ const getProjectLabel = (ids: number[]) => {
 <Select<string[]>
   labelId="proj-create"
   label="Proje"
+  disabled={isAdminCreate}
   multiple
   value={createForm.projectIds.map(String)}
   onChange={(e) => {
