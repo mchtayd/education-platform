@@ -38,6 +38,7 @@ export default function AdminSettings() {
     if (!currentPassword.trim()) {
       setSnack({ open: true, msg: "Mevcut şifre zorunludur.", severity: "warning" });
       return false;
+      
     }
     if (!newPassword.trim()) {
       setSnack({ open: true, msg: "Yeni şifre zorunludur.", severity: "warning" });

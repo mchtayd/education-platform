@@ -4,3 +4,5 @@ API/bin/
 API/obj/
 **/bin/
 **/obj/
+!.env.example
+.env

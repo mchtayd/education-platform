@@ -3,9 +3,9 @@ services:
     image: postgres:16
     container_name: edu_db
     environment:
-      POSTGRES_DB: education
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: mchtayd
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
@@ -17,19 +17,29 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=education;Username=postgres;Password=mchtayd;Pooling=true
 
-      # JWT (Production'da gerekli)
-      Jwt__Key: "super-secret-key-change-this-please-32bytes"
-      Jwt__Issuer: "EducationPlatform"
-      Jwt__Audience: "EducationPlatformClient"
-      Jwt__ExpiresMinutes: "120"
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Pooling=true
 
-      # Seed Admin (Production'da da oluşturulsun)
-      SeedAdmin__Email: "admin@edu.local"
-      SeedAdmin__Password: "Admin*12345"
-      SeedAdmin__Name: "Admin"
-      SeedAdmin__Surname: "User"
+      # JWT
+      Jwt__Key: ${JWT_KEY}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+      Jwt__ExpiresMinutes: ${JWT_EXPIRES_MINUTES}
+
+      # Seed Admin
+      SeedAdmin__Email: ${SEED_ADMIN_EMAIL}
+      SeedAdmin__Password: ${SEED_ADMIN_PASSWORD}
+      SeedAdmin__Name: ${SEED_ADMIN_NAME}
+      SeedAdmin__Surname: ${SEED_ADMIN_SURNAME}
+
+      # ✅ Gemini key (ASP.NET Core config binding)
+      Gemini__ApiKey: ${GEMINI_API_KEY}
+
+    # ✅ Runtime verileri korumak için (AI docs + wwwroot uploads)
+    volumes:
+      - api_uploads:/app/uploads
+      - api_wwwroot_uploads:/app/wwwroot/uploads
+
     depends_on:
       - db
     expose:
@@ -53,3 +63,5 @@ services:
 
 volumes:
   pgdata: {}
+  api_uploads: {}          # ✅ /app/uploads  (AI docs: uploads/ai_docs)
+  api_wwwroot_uploads: {}  # ✅ /app/wwwroot/uploads (görseller/diğer uploadlar)
