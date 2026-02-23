@@ -6,7 +6,7 @@ namespace API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "admin,trainer,educator,user")] // ✅ admin -> admin,trainer,educator,user
+[Authorize(Roles = "admin,trainer,educator,user")]
 public class AiQueryController : ControllerBase
 {
     private readonly AiRagService _rag;
@@ -22,8 +22,6 @@ public class AiQueryController : ControllerBase
     {
         public string Question { get; set; } = "";
         public int TopK { get; set; } = 8;
-
-        // ✅ frontend switch değeri
         public string? Provider { get; set; } // "ollama" | "gemini"
     }
 
@@ -36,7 +34,9 @@ public class AiQueryController : ControllerBase
         try
         {
             var topK = body.TopK <= 0 ? 8 : body.TopK;
-            var provider = string.IsNullOrWhiteSpace(body.Provider) ? null : body.Provider.Trim().ToLowerInvariant();
+            var provider = string.IsNullOrWhiteSpace(body.Provider)
+                ? null
+                : body.Provider.Trim().ToLowerInvariant();
 
             var (answer, sources) = await _rag.AskAsync(
                 body.Question.Trim(),
@@ -53,8 +53,32 @@ public class AiQueryController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            // Gemini key yok, provider yanlış vs -> 400
-            return BadRequest(new { message = ex.Message });
+            var msg = ex.Message ?? "AI sorgu hatası";
+
+            // ✅ Upstream hata kodunu mümkün olduğunca koru
+            if (msg.Contains("(503)"))
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+                {
+                    message = "Gemini şu anda yoğun (503). Birkaç saniye sonra tekrar deneyin veya Ollama'ya geçin.",
+                    detail = msg
+                });
+
+            if (msg.Contains("(429)"))
+                return StatusCode(StatusCodes.Status429TooManyRequests, new
+                {
+                    message = "AI servisinde istek limiti aşıldı (429). Biraz sonra tekrar deneyin.",
+                    detail = msg
+                });
+
+            if (msg.Contains("(403)"))
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    message = "Gemini erişim hatası (403). API key / kısıt / proje ayarlarını kontrol edin.",
+                    detail = msg
+                });
+
+            // provider yanlış, key yok, indeks yok vb.
+            return BadRequest(new { message = msg });
         }
         catch (Exception ex)
         {

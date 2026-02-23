@@ -251,12 +251,16 @@ export default function AdminAiContent() {
       setAnswer(data.answer);
       setSources(data.sources ?? []);
     } catch (err: any) {
-      setSnack({
-        open: true,
-        msg: err?.response?.data?.message ?? "Sorgu başarısız.",
-        severity: "error",
-      });
-    } finally {
+  setSnack({
+    open: true,
+    msg:
+      err?.response?.data?.message ??
+      (typeof err?.response?.data === "string" ? err.response.data : null) ??
+      err?.message ??
+      "Sorgu sırasında hata oluştu.",
+    severity: "error",
+  });
+} finally {
       setAsking(false);
     }
   };
